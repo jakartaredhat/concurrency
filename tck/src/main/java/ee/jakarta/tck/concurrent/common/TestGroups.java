@@ -16,6 +16,9 @@
 package ee.jakarta.tck.concurrent.common;
 
 public interface TestGroups {
-    /** Group for tests requiring the full platform */
+    /** Property user will set if they want to run in full profile */
+	String JAKARTAEE_FULL_PROPERTY = "jakarta.run.full.profile";
+	
+	/** Group for tests requiring the full platform */
     String JAKARTAEE_FULL = "eefull";
 }

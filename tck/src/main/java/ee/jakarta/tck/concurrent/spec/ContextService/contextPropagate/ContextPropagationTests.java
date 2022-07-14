@@ -20,10 +20,13 @@ import java.net.URL;
 
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.test.api.ArquillianResource;
+import org.jboss.arquillian.testng.Arquillian;
+import org.jboss.shrinkwrap.api.Archive;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.spec.EnterpriseArchive;
 import org.jboss.shrinkwrap.api.spec.JavaArchive;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
+import org.testng.annotations.Listeners;
 import org.testng.annotations.Test;
 
 import ee.jakarta.tck.concurrent.framework.TestClient;
@@ -31,66 +34,70 @@ import ee.jakarta.tck.concurrent.framework.TestConstants;
 import ee.jakarta.tck.concurrent.framework.URLBuilder;
 import ee.jakarta.tck.concurrent.spi.context.IntContextProvider;
 import ee.jakarta.tck.concurrent.spi.context.StringContextProvider;
+import ee.jakarta.tck.concurrent.framework.FullProfileInterceptor;
 import jakarta.enterprise.concurrent.spi.ThreadContextProvider;
 
 import static ee.jakarta.tck.concurrent.common.TestGroups.JAKARTAEE_FULL;
+import static ee.jakarta.tck.concurrent.common.TestGroups.JAKARTAEE_FULL_PROPERTY;
 
-@Test(groups = JAKARTAEE_FULL)
+@Listeners(FullProfileInterceptor.class)
 public class ContextPropagationTests extends TestClient {
 
 	public static final String LimitedBeanAppJNDI = "java:app/ContextPropagationTests_ejb/LimitedBean";
 
-	
 	@Deployment(name="ContextPropagationTests", testable=false)
-	public static EnterpriseArchive createDeployment() {
+	public static Archive<?> createDeployment() {
 		
-		WebArchive war = ShrinkWrap.create(WebArchive.class, "ContextPropagationTests_web.war")
-				.addPackages(true, getFrameworkPackage(), getContextPackage(), getContextProvidersPackage())
-				.addClasses(
-						ContextServiceDefinitionServlet.class,
-						ClassloaderServlet.class,
-						JNDIServlet.class,
-						SecurityServlet.class,
-						JSPSecurityServlet.class,
-						ContextServiceDefinitionFromEJBServlet.class)
-				.addAsServiceProvider(ThreadContextProvider.class.getName(), IntContextProvider.class.getName(), StringContextProvider.class.getName())
-				.addAsWebInfResource(ContextPropagationTests.class.getPackage(), "web.xml", "web.xml")
-				.addAsWebResource(ContextPropagationTests.class.getPackage(), "jspTests.jsp", "jspTests.jsp");
+		final boolean isFullProfile = Boolean.getBoolean(JAKARTAEE_FULL_PROPERTY);
 		
-		JavaArchive jar = ShrinkWrap.create(JavaArchive.class, "ContextPropagationTests_ejb.jar")
-				.addPackages(true, getFrameworkPackage(), ContextPropagationTests.class.getPackage())
-				.deleteClasses(
-						ContextServiceDefinitionServlet.class,
-						ClassloaderServlet.class,
-						JNDIServlet.class,
-						SecurityServlet.class,
-						JSPSecurityServlet.class,
-						ContextServiceDefinitionFromEJBServlet.class)
-				.addAsManifestResource(ContextPropagationTests.class.getPackage(), "ejb-jar.xml", "ejb-jar.xml");
-				//TODO document how users can dynamically inject vendor specific deployment descriptors into this archive
-		
-		EnterpriseArchive ear = ShrinkWrap.create(EnterpriseArchive.class, "ContextPropagationTests.ear").addAsModules(war, jar);
-		
-		return ear;
+		if(isFullProfile) {
+			WebArchive war = ShrinkWrap.create(WebArchive.class, "ContextPropagationTests_web.war")
+					.addPackages(true, getFrameworkPackage(), getContextPackage(), getContextProvidersPackage())
+					.addClasses(
+							ContextServiceDefinitionServlet.class,
+							ClassloaderServlet.class,
+							JNDIServlet.class,
+							SecurityServlet.class,
+							JSPSecurityServlet.class,
+							ContextServiceDefinitionFromEJBServlet.class)
+					.addAsServiceProvider(ThreadContextProvider.class.getName(), IntContextProvider.class.getName(), StringContextProvider.class.getName())
+					.addAsWebInfResource(ContextPropagationTests.class.getPackage(), "web.xml", "web.xml")
+					.addAsWebResource(ContextPropagationTests.class.getPackage(), "jspTests.jsp", "jspTests.jsp");
+			
+			JavaArchive jar = ShrinkWrap.create(JavaArchive.class, "ContextPropagationTests_ejb.jar")
+					.addPackages(true, getFrameworkPackage(), ContextPropagationTests.class.getPackage())
+					.deleteClasses(
+							ContextServiceDefinitionServlet.class,
+							JSPSecurityServlet.class,
+							ContextServiceDefinitionFromEJBServlet.class)
+					.addAsManifestResource(ContextPropagationTests.class.getPackage(), "ejb-jar.xml", "ejb-jar.xml");
+					//TODO document how users can dynamically inject vendor specific deployment descriptors into this archive
+			
+			EnterpriseArchive ear = ShrinkWrap.create(EnterpriseArchive.class, "ContextPropagationTests.ear").addAsModules(war, jar);
+			
+			return ear;
+		} else {
+			WebArchive war = ShrinkWrap.create(WebArchive.class, "ContextPropagationTests_web.war")
+					.addPackages(true, getFrameworkPackage(), getContextPackage(), getContextProvidersPackage())
+					.addClasses(
+							ContextServiceDefinitionServlet.class,
+							ClassloaderServlet.class,
+							SecurityServlet.class,
+							JSPSecurityServlet.class)
+					.addAsServiceProvider(ThreadContextProvider.class.getName(), IntContextProvider.class.getName(), StringContextProvider.class.getName())
+					.addAsWebInfResource(ContextPropagationTests.class.getPackage(), "web.xml", "web.xml")
+					.addAsWebResource(ContextPropagationTests.class.getPackage(), "jspTests.jsp", "jspTests.jsp");
+						
+			return war;
+		}
+
 	}
-	
-	@ArquillianResource(JNDIServlet.class)
-	URL jndiURL;
 	
 	@ArquillianResource(JSPSecurityServlet.class)
 	URL jspURL;
 	
-	@ArquillianResource(ClassloaderServlet.class)
-	URL classloaderURL;
-	
-	@ArquillianResource(SecurityServlet.class)
-	URL securityURL;
-	
 	@ArquillianResource(ContextServiceDefinitionServlet.class)
 	URL contextURL;
-	
-	@ArquillianResource(ContextServiceDefinitionFromEJBServlet.class)
-	URL ejbContextURL;
 
 	// HttpServletRequest.getUserPrincipal behavior is unclear when accessed from another thread or the current user is changed
 	@Test(enabled = false)
@@ -124,8 +131,8 @@ public class ContextPropagationTests extends TestClient {
 	 * verify JNDI Context.
 	 *
 	 */
-	@Test
-	public void testJNDIContextAndCreateProxyInServlet() {
+	@Test(groups = JAKARTAEE_FULL, dataProvider = Arquillian.ARQUILLIAN_DATA_PROVIDER)
+	public void testJNDIContextAndCreateProxyInServlet(@ArquillianResource(JNDIServlet.class) URL jndiURL) {
 		URLBuilder requestURL = URLBuilder.get().withBaseURL(jndiURL).withPaths("JNDIServlet").withTestName(testName);
 		String resp = runTestWithResponse(requestURL, null);
 		this.assertStringInResponse(testName + "failed to get correct result.", "JNDIContextWeb", resp);
@@ -145,8 +152,8 @@ public class ContextPropagationTests extends TestClient {
 	 * verify JNDI Context.
 	 *
 	 */
-	@Test
-	public void testJNDIContextAndCreateProxyInEJB() {
+	@Test(groups = JAKARTAEE_FULL, dataProvider = Arquillian.ARQUILLIAN_DATA_PROVIDER)
+	public void testJNDIContextAndCreateProxyInEJB(@ArquillianResource(JNDIServlet.class) URL jndiURL) {
 		URLBuilder requestURL = URLBuilder.get().withBaseURL(jndiURL).withPaths("JNDIServlet").withTestName(testName);
 		String resp = runTestWithResponse(requestURL, null);
 		this.assertStringInResponse(testName + "failed to get correct result.", "JNDIContextEJB", resp);
@@ -164,8 +171,8 @@ public class ContextPropagationTests extends TestClient {
 	 * verify classloader.
 	 *
 	 */
-	@Test
-	public void testClassloaderAndCreateProxyInServlet() {
+	@Test(groups = JAKARTAEE_FULL, dataProvider = Arquillian.ARQUILLIAN_DATA_PROVIDER)
+	public void testClassloaderAndCreateProxyInServlet(@ArquillianResource(SecurityServlet.class) URL securityURL) {
 		URLBuilder requestURL = URLBuilder.get().withBaseURL(securityURL).withPaths("ClassloaderServlet").withTestName(testName);
 		String resp = runTestWithResponse(requestURL, null);
 		this.assertStringInResponse(testName + "failed to get correct result.", TestConstants.ComplexReturnValue, resp);
@@ -184,8 +191,8 @@ public class ContextPropagationTests extends TestClient {
 	 * verify permission.
 	 *
 	 */
-	@Test
-	public void testSecurityAndCreateProxyInServlet() {
+	@Test(groups = JAKARTAEE_FULL, dataProvider = Arquillian.ARQUILLIAN_DATA_PROVIDER)
+	public void testSecurityAndCreateProxyInServlet(@ArquillianResource(ClassloaderServlet.class) URL classloaderURL) {
 		URLBuilder requestURL = URLBuilder.get().withBaseURL(classloaderURL).withPaths("SecurityServlet").withTestName(testName);
 		String resp = runTestWithResponse(requestURL, null);
 		this.assertStringInResponse(testName + "failed to get correct result.", TestConstants.ComplexReturnValue, resp);
@@ -209,8 +216,9 @@ public class ContextPropagationTests extends TestClient {
      * ContextA, which is tested here, propagates Application context and IntContext,
      * clears StringContext, and leaves Transaction context unchanged.
      */
-	@Test
-    public void testContextServiceDefinitionFromEJBAllAttributes() throws Throwable {
+	@Test(groups = JAKARTAEE_FULL, dataProvider = Arquillian.ARQUILLIAN_DATA_PROVIDER)
+    public void testContextServiceDefinitionFromEJBAllAttributes(@ArquillianResource(ContextServiceDefinitionFromEJBServlet.class)
+	URL ejbContextURL) throws Throwable {
 		URLBuilder requestURL = URLBuilder.get().withBaseURL(ejbContextURL).withPaths("ContextServiceDefinitionFromEJBServlet").withTestName(testName);
 		runTest(requestURL);
     }
@@ -229,8 +237,9 @@ public class ContextPropagationTests extends TestClient {
      * A ContextServiceDefinition defined in an EJB with minimal attributes configured
      * clears transaction context and propagates other types.
      */
-	@Test
-    public void testContextServiceDefinitionFromEJBDefaults() throws Throwable {
+	@Test(groups = JAKARTAEE_FULL, dataProvider = Arquillian.ARQUILLIAN_DATA_PROVIDER)
+    public void testContextServiceDefinitionFromEJBDefaults(@ArquillianResource(ContextServiceDefinitionFromEJBServlet.class)
+	URL ejbContextURL) throws Throwable {
 		URLBuilder requestURL = URLBuilder.get().withBaseURL(ejbContextURL).withPaths("ContextServiceDefinitionFromEJBServlet").withTestName(testName);
 		runTest(requestURL);
     }
@@ -278,7 +287,17 @@ public class ContextPropagationTests extends TestClient {
     public void testContextualSupplier() throws Throwable {
 		URLBuilder requestURL = URLBuilder.get().withBaseURL(contextURL).withPaths("ContextServiceDefinitionServlet").withTestName(testName);
 		runTest(requestURL);
-        requestURL = URLBuilder.get().withBaseURL(ejbContextURL).withPaths("ContextServiceDefinitionFromEJBServlet").withTestName(testName);
+    }
+	
+    /**
+     * A ContextService contextualizes a Supplier, which can be supplied as a dependent stage action
+     * to an unmanaged CompletableFuture. The dependent stage action runs with the thread context of
+     * the thread that contextualizes the Supplier, per the configuration of the ContextServiceDefinition.
+     */
+	@Test(groups = JAKARTAEE_FULL, dataProvider = Arquillian.ARQUILLIAN_DATA_PROVIDER)
+    public void testContextualSupplierEJB(@ArquillianResource(ContextServiceDefinitionFromEJBServlet.class)
+	URL ejbContextURL) throws Throwable {
+		URLBuilder requestURL = URLBuilder.get().withBaseURL(ejbContextURL).withPaths("ContextServiceDefinitionFromEJBServlet").withTestName("testContextualSupplier");
         runTest(requestURL);
     }
 
